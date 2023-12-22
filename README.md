@@ -1,72 +1,67 @@
-README
-
-This zip file contains following files:
-
-1. invert.py
-2. search.py
-3. eval.py
-4. ui.py
-5. .png screenshots of example outputs
-6. cacm.tar
-7. stopwords.txt
-8. README.md
-
-==========
 ABOUT
 ==========
 
-This IR System uses a tf-idf weighting schemes with the log of base 10 with the following formulas:
+This IR system was created for a university course on Information Retrieval; it is coded in Python and runs in the command line. An inverted index is initially used to create the postings and dictionary files, followed by running the IR system via the user interface (ui.py). An evaluation (eval.py) of the system is also included.
+
+
+The IR system uses a tf-idf weighting scheme with the log of base 10 with the following formulas:
 
 f = total count of the term's occurrence in that document
+
 tf = log(f) + 1
 
 term_df = total count of the term in all documents
+
 N = 3204 total docs in collection
 idf = log(N / term_df)
 
 Before running any of eval.py, search.py, or ui.py, invert.py must be run to creating the terms and postings files.
 
-==========
+
 invert.py
 ==========
-!! MUST BE RUN FIRST BEFORE OTHER FILES !!
-
-Run in the command line 
+Runs in the command line 
 
 To create an inverted index enter the following command in the command line--the third argument must be stemOn to turn on stemming or stemOff to turn off stemming:
 
 i.e. to enable stemming:
 
->>python invert.py 'cacm.tar' stemOn
+```console
+> python invert.py 'cacm.tar' stemOn
+```
 
 To disable stemming:
->>python invert.py 'cacm.tar' stemOff
+
+```console
+> python invert.py 'cacm.tar' stemOff
+```
 
 Two output files, <terms_dict.json> and <postings_dict.json> will be created. The inverted index is organized alphabetically by term. The index of the term in terms_dict.json corresponds to the index of its postings in postings_dict.json.
 
-===========
+
 search.py
 ===========
 Returns the top 20 documents based on cosine similarity score. Before selecting the top-k docs, a threshold of 2.75 is set, so only document vectors with term weights of that magnitude will be selected to perform the cosine similarity.
 
 To run in the command line:
 
->>python search.py <query> <Yes/No>
+```console
+>> python search.py <query> <Yes/No>
+```
 
 <query> should be put in double quotes. Entering <Yes> enables stemming, while <No> disables it.
 
 
-==========
+
 ui.py
 ==========
 
 The file is run in the command line as:
 
->>python ui.py
+<code>>> python ui.py</code>
 
 The user will first be prompted to enter a free-text query, and then asked to confirm if stemming should be enabled or disabled, after which the command line will display a ranked retrieval of all relevant documents. The user will be continually prompted for further queries and can enter 'ZZEND' at either prompt to exit the program.
 
-==========
 eval.py
 ==========
 
@@ -74,15 +69,16 @@ eval.py
 
 This program runs on the command line as:
 
->>python eval.py <Yes/No>
+<code>>>python eval.py <Yes/No></code>
 
-Where entering one of <Yes> or <No> as a command line argument enables (<Yes>) or disables (<No>) stemming on the query
+Where entering one of <code>Yes</code> or <code>No</code> as a command line argument enables (<code>Yes</code>) or disables (<code>No</code>) stemming on the query
 
 qrels.text and query.text are taken in as inputs and parsed. This program first passes each extracted query into search.py. The returned top 20 docs from search.py is then used to calculate the AP, MAP and the average R-precision values. The MAP is displayed on the command line along with the average R-precision scores for each query.
 
 An example output:
 
-PS C:\Users\maycr\Downloads\CCPS842\Assignment2> & C:/Users/maycr/anaconda3/python.exe eval.py Yes
+```console
+python.exe eval.py Yes
 Running evaluations...
 Mean Average Precision (MAP): 0.17850279993492535
 R-Precision values:
@@ -138,3 +134,4 @@ Query 61, R-Precision: 0.1935483870967742
 Query 62, R-Precision: 0.125
 Query 63, R-Precision: 0.08333333333333333
 Query 64, R-Precision: 1.0
+```
