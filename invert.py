@@ -52,7 +52,6 @@ def load_raw_docs_file(input_collection):
     if current_doc_id is not None:
         documents[current_doc_id] = '\n'.join(current_doc_content)
 
-    # Close the .tar file
     tar.close()
 
     return documents
@@ -97,7 +96,9 @@ def preprocess_and_inverted_index(documents, document_stemming):
         for term, positions in term_positions.items():
             inverted_index[term][doc_id] = {'positions': positions, 'term frequency': ((math.log(len(positions),10) + 1))}
 
+    # sort alphabetically
     sorted_inverted_index = {term: inverted_index[term] for term in sorted(inverted_index)}
+
     return sorted_inverted_index
 
 def create_output_files(inverted_index):
@@ -120,7 +121,7 @@ def create_output_files(inverted_index):
 def main():
 
     if len(sys.argv) < 2:
-        print(f"No collection file found as input!\nUsage: invert.py [collection file]")
+        print(f"No collection file found as input!\nUsage: invert.py <collection tar file> < 'stemOn' or 'stemOff' >")
     else:
         while True:
 
@@ -130,16 +131,16 @@ def main():
 
             raw_docs = load_raw_docs_file(input_collection)
             
-            user_stemming = input(f"Please confirm if you wish to perform stemming and stop word removals (Enter Yes/No)\n")
+            user_stemming = sys.argv[2]
             
-            if user_stemming == "Yes" or user_stemming == 'yes':
+            if user_stemming == "stemOn":
                 print(f"Documents pre-processing with stemming...")
                 inverted_index = preprocess_and_inverted_index(raw_docs, True)
-            elif user_stemming == "No" or user_stemming == 'no':
+            elif user_stemming == "stemOff":
                 print(f"Documents pre-processing without stemming...")
                 inverted_index = preprocess_and_inverted_index(raw_docs, False)
             else:
-                print(f"Invalid Input! Please only enter Yes or No")
+                print(f"Invalid Input! Please only enter stemOff or stemOn to disable/enable stemming")
                 break
 
             # Export the inverted index to files

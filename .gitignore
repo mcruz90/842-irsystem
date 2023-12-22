@@ -1,0 +1,7 @@
+TestFiles/
+__pycache__
+.ipynb_checkpoints
+*.ipynb
+*.tar
+*.zip
+*.json

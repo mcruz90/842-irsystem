@@ -1,12 +1,67 @@
 from nltk.stem import PorterStemmer
-from invert import load_raw_docs_file
 import sys
 import math
 import numpy as np
 import re
 import json
+import tarfile
 
-# Confirms if user-entered term exists in the input terms_dict.json file
+def load_raw_docs_file(tar_input):
+    target_extension = '.all'
+    documents = {}
+    current_doc_id = None
+    current_doc_content = []
+    skip_content = False
+
+    for member in tar_input.getmembers():
+        if member.isfile() and member.name.endswith(target_extension):
+            with tar_input.extractfile(member) as file:
+                # Read and decode the file in larger chunks to lower # of calls made
+                chunk_size = 1024
+                decoded_chunk = ""
+
+                for chunk in iter(lambda: file.read(chunk_size), b''):
+                    decoded_chunk += chunk.decode('utf-8')
+                    lines = decoded_chunk.split('\n')
+                    decoded_chunk = lines.pop()
+
+                    for line in lines:
+                        # Get the first two chars of the line to check the section labels
+                        section_label = line[:2]
+
+                        if section_label == ".I":
+                            if current_doc_id is not None:
+                                documents[current_doc_id] = '\n'.join(current_doc_content)
+                            current_doc_id = line.split()[-1]
+                            current_doc_content = []
+                            skip_content = False
+                        elif section_label in {".N", ".X"}:
+                            skip_content = True
+                        elif not skip_content:
+                            current_doc_content.append(line)
+
+                if decoded_chunk:
+                    lines = decoded_chunk.split('\n')
+                    for line in lines:
+                        section_label = line[:2]
+                        if section_label == ".I":
+                            if current_doc_id is not None:
+                                documents[current_doc_id] = '\n'.join(current_doc_content)
+                            current_doc_id = line.split()[-1]
+                            current_doc_content = []
+                            skip_content = False
+                        elif section_label in {".N", ".X"}:
+                            skip_content = True
+                        elif not skip_content:
+                            current_doc_content.append(line)
+
+    if current_doc_id is not None:
+        documents[current_doc_id] = '\n'.join(current_doc_content)
+
+    return documents
+
+
+# Confirms if user-provided term exists in the input terms_dict.json file
 def term_found(user_input, terms_data):    
     if user_input in terms_data:
         return True
@@ -18,27 +73,22 @@ def get_doc_ids(term_exists, user_input, terms_data):
     if term_exists:
         return list(terms_data.keys()).index(user_input)
     
-# Called when a search term is found in the documents; returns the doc IDs, term positions, and its frequency in that doc    
+# Called when a search term is found in the documents; returns the postings of that term
 def search_postings(term_index, postings_data):    
     return postings_data[term_index]
 
-# Gets docs and displays a small context of the doc that has that term, along with the doc IDs, positions, and frequency
-
-def retrieve_docs(term, postings):
+# Returns list of retrieved docs that have that them
+def retrieve_docs(term, postings, raw_docs):
     results = []
-    raw_docs = load_raw_docs_file('cacm.tar')
 
     for doc_id, content in postings.items():
         positions = content['positions']
-
         term_frequency = content['term frequency']
-
         doc_content = raw_docs[doc_id]
 
         # Initialize variables that store the document title, author, and its terms
         title = None
         author = None
-        terms = []
 
         # Split doc_content into lines
         lines = doc_content.split('\n')
@@ -51,17 +101,25 @@ def retrieve_docs(term, postings):
 
         # Iterate through the lines to extract only the title and the author's name 
         for i, line in enumerate(lines):
-            if line.startswith('.T'):
+            # Check the first two characters of the line for section labels
+            section_label = line[:2]
+
+            if section_label == '.T':
                 # The title is on the next line
-                title = lines[i + 1].strip()
+                title = lines[i + 1]
+                for char in reversed(title):
+                    if not char.isspace():
+                        title = title[:title.index(char) + 1]
+                        break
                 in_a_section = False
-            elif line.startswith('.A'):
+            elif section_label == '.A':
                 in_a_section = True
                 # The Author's name is on the next line
-                author = lines[i + 1].strip()
-
-        # Join the terms into a single string
-        content = ' '.join(terms)
+                author = lines[i + 1]
+                for char in reversed(author):
+                    if not char.isspace():
+                        author = author[:author.index(char) + 1]
+                        break
 
         result = {
             'Term': term,
@@ -76,7 +134,9 @@ def retrieve_docs(term, postings):
 
     return results
 
-def term_stemming(query_term):
+
+
+def term_stemming(query_term, isStemming):
 
     with open('stopwords.txt', 'r') as stopword_file:
                 stop_words = set(stopword_file.read().splitlines())
@@ -84,9 +144,11 @@ def term_stemming(query_term):
     pattern = "[^0-9a-zA-Z\s]+"
     tokened_query = query_term.lower().split()
 
-    stemmer = PorterStemmer()
     alphanum_terms = [re.sub(pattern, "", c).strip() for c in tokened_query]
-    alphanum_terms = [stemmer.stem(word) for word in alphanum_terms if word not in stop_words and word != ""]
+    
+    if isStemming == 'Yes':
+        stemmer = PorterStemmer()
+        alphanum_terms = [stemmer.stem(word) for word in alphanum_terms if word not in stop_words and word != ""]
     
     if len(alphanum_terms) == 0:
         return ""
@@ -99,8 +161,8 @@ def get_df(term_exists, user_input, terms_data):
 
 def main():
 
-        if len(sys.argv) != 2:
-            print(f"No input query received!\nUsage: search.py <query> (in double quotes) ")
+        if len(sys.argv) != 3:
+            print(f"No input query received!\nUsage: search.py <query> (in double quotes) <Yes/No> ")
             
         else:
             terms_file = 'terms_dict.json'
@@ -111,8 +173,12 @@ def main():
 
             with open(postings_file, 'r') as postings_file:
                 postings_data = json.load(postings_file)
+
+            with tarfile.open('cacm.tar', 'r') as tar:
+                docs_tar_file = load_raw_docs_file(tar)
                 
             user_string = sys.argv[1]
+            user_stemming = sys.argv[2]
             user_query = user_string.split()
             
             doc_data = []
@@ -124,7 +190,7 @@ def main():
             term_idf = None
             
             for char in user_query:
-                processed_term = term_stemming(char)
+                processed_term = term_stemming(char, user_stemming)
                 term_exists = term_found(processed_term, terms_data)
                     
                 if term_exists:
@@ -132,7 +198,7 @@ def main():
                     query_terms.append(processed_term)
                     idx = get_doc_ids(term_exists, processed_term, terms_data)
                     postings_results = search_postings(str(idx), postings_data)
-                    docs = retrieve_docs(processed_term, postings_results)
+                    docs = retrieve_docs(processed_term, postings_results, docs_tar_file)
                     
                     term_df = get_df(term_exists, processed_term, terms_data)
                     term_idf = math.log((N/term_df),10)
@@ -199,7 +265,7 @@ def main():
             sim_qd = {}
 
             # Term Weight threshold
-            weight_threshold = 1.2
+            weight_threshold = 2.75
 
             # Initialize a dictionary to store matching documents
             threshold_documents = {}
@@ -228,13 +294,14 @@ def main():
                 
             sorted_sim_qd = dict(sorted(sim_qd.items(), key=lambda item: item[1], reverse=True))
             
-            topk_docs = {k: v for k, v in list(sorted_sim_qd.items())[:10]}
+            topk_docs = {k: v for k, v in list(sorted_sim_qd.items())[:20]}
 
             for id, score in topk_docs.items():
                 print(f"{id}: {score}")
 
             output_json = json.dumps(topk_docs)
-
+            
+            tar.close()
 
 if __name__ == "__main__":
     main()

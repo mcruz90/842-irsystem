@@ -2,58 +2,47 @@ import subprocess
 import tarfile
 import re
 import multiprocessing
+import sys
+from functools import partial
 
 # Reads and parses query.text file and returns a dictionary of queries
-def parse_queries():
-    tar_file = tarfile.open('cacm.tar', 'r')
+def parse_queries(tar_file):
     file_name = 'query.text'
 
-    # Check if the file exists in the archive and processes each line
     if file_name in tar_file.getnames():
         file_contents = tar_file.extractfile(file_name).read().decode('utf-8')
         lines = file_contents.splitlines()
 
-        # Initialize an empty dictionary to store the content
         content_dict = {}
         current_key = None 
         is_reading_content = False  
 
-        # Iterate through each line in file
         for i, line in enumerate(lines):
             if line.startswith('.I'):
-                # Get the key from the '.I' line
                 current_key = int(line.split()[1])
                 content_dict[current_key] = '' 
                 is_reading_content = False
             elif line.startswith('.W'):
-                # Start appending the lines to the value in the key-value pair
                 if current_key is not None:
                     is_reading_content = True
-                    # Extract text in the line after '.W'
                     content_dict[current_key] += line.lstrip('.W').strip()
             elif is_reading_content:
                 if line.startswith('.A') or line.startswith('.N'):
-                    # Stop reading content once in '.A' or '.N' sections
                     is_reading_content = False
                 else:
-                    # Append the lines to the value associated with the current key
                     content_dict[current_key] += ' ' + line.strip()
         
-    tar_file.close()
     return content_dict
 
-def parse_qrel():
-    tar_file = tarfile.open('cacm.tar', 'r')
+# Reads and parses query.text file and returns a dictionary of queries
+def parse_qrel(tar_file):
     file_name = 'qrels.text'
 
-    # Check if the file exists in the archive
     if file_name in tar_file.getnames():
         file_contents = tar_file.extractfile(file_name).read().decode('utf-8')
-        
-    # Create a dictionary to store relevant documents
+    
     relevant_docs = {}
 
-    # Parse the content line by line
     for line in file_contents.split('\n'):
         if line.strip():
             parts = line.split()
@@ -63,16 +52,18 @@ def parse_qrel():
             else:
                 relevant_docs[query_id] = [doc_id]
 
-    tar_file.close()
     return relevant_docs
 
+# Return query string
 def get_query(idx, queries_dict):
     return queries_dict[idx]
 
-def query_search(query):
-    result = subprocess.run(['C:/Users/maycr/anaconda3/python.exe', 'search.py', query], stdout=subprocess.PIPE, text=True)
+# Run search.py and return top-k results for that query
+def query_search(query, user_stemming):
+    result = subprocess.run(['C:/Users/maycr/anaconda3/python.exe', 'search.py', query, user_stemming], stdout=subprocess.PIPE, text=True)
     return result
 
+# return the precision@k
 def calculate_precision_at_k(retrieved, relevant_docs):
     precision_at_k = []
     num_relevant_found = 0
@@ -84,22 +75,24 @@ def calculate_precision_at_k(retrieved, relevant_docs):
 
     if not precision_at_k:
         return 0.0
-
     return sum(precision_at_k) / len(relevant_docs)
 
+# Returns that average precision of a query, comparing relevant docs vs retrieved docs
 def average_precision(query_id, relevant_docs, retrieved_docs):
     retrieved = retrieved_docs.get(query_id, [])
     return calculate_precision_at_k(retrieved, relevant_docs)
 
-def mean_average_precision(ground_truth, retrieved_docs):
+# Return MAP for the whole I-R system
+def mean_average_precision(relevant_docs, retrieved_docs):
     total_ap = 0.0
-    num_queries = len(ground_truth)
+    num_queries = len(relevant_docs)
 
-    for query_id, relevant_docs in ground_truth.items():
-        total_ap += average_precision(query_id, relevant_docs, retrieved_docs)
+    for query_id, relevant_doc in relevant_docs.items():
+        total_ap += average_precision(query_id, relevant_doc, retrieved_docs)
 
     return total_ap / num_queries
 
+# Returns R-Precision Value of a query against the retrieved docs and relevant docs
 def r_precision(query_id, relevant_docs, retrieved_docs):
     retrieved = retrieved_docs.get(query_id, [])
     num_relevant = len(relevant_docs)
@@ -111,11 +104,11 @@ def r_precision(query_id, relevant_docs, retrieved_docs):
 
     return num_relevant_found / num_relevant
 
-def calculate_r_precision(ground_truth, retrieved_docs):
+def calculate_r_precision(relevant_docs, retrieved_docs):
     r_precision_values = []
 
-    for query_id, relevant_docs in ground_truth.items():
-        r_precision_values.append(r_precision(query_id, relevant_docs, retrieved_docs))
+    for query_id, relevant_doc in relevant_docs.items():
+        r_precision_values.append(r_precision(query_id, relevant_doc, retrieved_docs))
 
     return r_precision_values
 
@@ -126,20 +119,22 @@ def extract_doc_scores(output):
 
     return doc_scores
 
+# Return dict of scores run on the IR system for each query
 def get_ir_results(queries, results):
     ir_results = {}
 
     # Extract and process the document IDs and scores from each result
-    for result, (query, query_id) in zip(results, queries.items()):
+    for result, (_, query_id) in zip(results, queries.items()):
         doc_scores = extract_doc_scores(result.stdout)
         ir_results[query_id] = doc_scores
 
     return ir_results
 
+# Returns key-value pairs of doc_id-scores
 def get_retrieved_docs(ir_results):
     retrieved_docs = {}
     for i, (key, value) in enumerate(ir_results.items()):
-        if i < 1:  # Specify the number of elements per group
+        if i < 1: 
             group = 1
         else:
             group = (i // 1) + 1
@@ -159,14 +154,18 @@ def get_relevant_doc_ids(extracted_qrels):
 
 def main():
 
-    queries = parse_queries()
+    user_stemming = sys.argv[1]
+    with tarfile.open('cacm.tar', 'r') as tar:
+        queries = parse_queries(tar)
+        extracted_qrel = parse_qrel(tar)
 
     print("Running evaluations...")
 
     # Using multiprocessing pool to decrease processing time
     # Uses 4 less than total CPU available to prevent using too many 
-    pool = multiprocessing.Pool(processes=(multiprocessing.cpu_count()-4)) 
-    results = pool.map(query_search, queries.values())
+    pool = multiprocessing.Pool(processes=(multiprocessing.cpu_count() - 4))
+    partial_query_search = partial(query_search, user_stemming=user_stemming)
+    results = pool.map(partial_query_search, queries.values())
     pool.close()
 
     ###### Evaluations ####### 
@@ -176,7 +175,6 @@ def main():
     retrieved_docs = get_retrieved_docs(ir_results)
     
     # Relevant Docs
-    extracted_qrel = parse_qrel()
     relevant_doc_ids = get_relevant_doc_ids(extracted_qrel)
 
     # Calculate MAP, R-Precision, and R-Precision values
@@ -194,6 +192,7 @@ def main():
     for qid, rp_value in zip(relevant_docs_keys, r_precision_values):
         print(f"Query {qid}, R-Precision: {rp_value}")
 
-if __name__ == "__main__":
+    tar.close()
 
+if __name__ == "__main__":
     main()
