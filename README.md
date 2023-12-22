@@ -1,7 +1,9 @@
 ABOUT
 ==========
 
-This IR system was created for a university course on Information Retrieval; it is coded in Python and runs in the command line. An inverted index is initially used to create the postings and dictionary files, followed by running the IR system via the user interface (ui.py). An evaluation (eval.py) of the system is also included.
+This IR system was created for a university course on Information Retrieval; it is coded in Python and runs in the command line. A .tar file containing 3204 documents was included to test the system, but left out of this repo in respect of copyright terms with the course instructor.
+
+An inverted index is initially used to create the postings and dictionary files, followed by running the IR system via the user interface (ui.py). An evaluation (eval.py) of the system is also included.
 
 
 The IR system uses a tf-idf weighting scheme with the log of base 10 with the following formulas:
@@ -20,8 +22,6 @@ Before running any of eval.py, search.py, or ui.py, invert.py must be run to cre
 
 invert.py
 ==========
-Runs in the command line 
-
 To create an inverted index enter the following command in the command line--the third argument must be stemOn to turn on stemming or stemOff to turn off stemming:
 
 i.e. to enable stemming:
@@ -36,7 +36,7 @@ To disable stemming:
 > python invert.py 'cacm.tar' stemOff
 ```
 
-Two output files, <terms_dict.json> and <postings_dict.json> will be created. The inverted index is organized alphabetically by term. The index of the term in terms_dict.json corresponds to the index of its postings in postings_dict.json.
+Two output files, <code>< terms_dict.json ></code> and <code>< postings_dict.json ></code> will be created. The inverted index is organized alphabetically by term. The index of the term in terms_dict.json corresponds to the index of its postings in postings_dict.json.
 
 
 search.py
@@ -49,7 +49,7 @@ To run in the command line:
 >> python search.py <query> <Yes/No>
 ```
 
-<query> should be put in double quotes. Entering <Yes> enables stemming, while <No> disables it.
+<code>< query ></code> should be put in double quotes if entering more than a single search term. Entering <code>< Yes ></code> enables stemming, while <code> < No > </code> disables it.
 
 
 
@@ -69,7 +69,7 @@ Example output:
 eval.py
 ==========
 
-!! Note: This program takes roughly 35 seconds to complete on a 13th Gen Intel(R) Core(TM) i5-1335U processor. I attempted to lower the original time taken of ~60 seconds by using a multiprocessing pool over the total number of available CPUs minus 4. !!
+Note: This program takes roughly 35 seconds to complete on a 13th Gen Intel(R) Core(TM) i5-1335U processor. I attempted to lower the original time taken of ~60 seconds by using a multiprocessing pool over the total number of available CPUs minus 4. 
 
 This program runs on the command line as:
 
