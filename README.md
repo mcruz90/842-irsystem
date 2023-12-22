@@ -62,10 +62,14 @@ The file is run in the command line as:
 
 The user will first be prompted to enter a free-text query, and then asked to confirm if stemming should be enabled or disabled, after which the command line will display a ranked retrieval of all relevant documents. The user will be continually prompted for further queries and can enter 'ZZEND' at either prompt to exit the program.
 
+Example output:
+
+<img src="Screenshot 2023-11-05 204239.png">
+
 eval.py
 ==========
 
-!! Note: This program takes roughly 35 seconds to complete on a 13th Gen Intel(R) Core(TM) i5-1335U processor! My apologies for the amount of time taken! I attempted to lower the original time taken of ~60 seconds by using a multiprocessing pool over the total number of available CPUs minus 4. !!
+!! Note: This program takes roughly 35 seconds to complete on a 13th Gen Intel(R) Core(TM) i5-1335U processor. I attempted to lower the original time taken of ~60 seconds by using a multiprocessing pool over the total number of available CPUs minus 4. !!
 
 This program runs on the command line as:
 
